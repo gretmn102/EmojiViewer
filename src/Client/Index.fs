@@ -4,11 +4,8 @@ open Elmish
 open Fable.Remoting.Client
 open Shared
 
-
-type Deferred<'t> =
-    | HasNotStartedYet
-    | InProgress
-    | Resolved of 't
+open Fulma.Extensions
+open Fulma.Extensions.Types
 
 let api =
     Remoting.createApi()
@@ -16,65 +13,8 @@ let api =
     |> Remoting.buildProxy<IApi>
 
 module InputTags =
-    open Fulma.Extensions
-    type State =
-        {
-            InputTagsState: InputTags.State
-            TagsSuggestions: Deferred<string []>
-        }
-    type Msg =
-        | SetInputTagsState of InputTags.State
-        | GetSuggestions of string
-        | GetSuggestionsResult of string []
-    let init () =
-        let state =
-            {
-                InputTagsState = InputTags.State.Empty
-                TagsSuggestions = HasNotStartedYet
-            }
-        state
-
-    let update (msg: Msg) (state: State) =
-        match msg with
-        | SetInputTagsState inputTagsState ->
-            let state =
-                { state with InputTagsState = inputTagsState }
-            state, Cmd.none
-        | GetSuggestions pattern ->
-            if pattern = "" then
-                let state =
-                    { state with
-                        TagsSuggestions = Resolved [||] }
-                state, Cmd.none
-            else
-                let cmd =
-                    Cmd.OfAsync.perform api.getTagSuggestions pattern GetSuggestionsResult
-                let state =
-                    { state with
-                        TagsSuggestions = InProgress }
-                state, cmd
-        | GetSuggestionsResult tags ->
-            let state =
-                { state with
-                    TagsSuggestions = Resolved tags }
-            state, Cmd.none
-
-    open Fable.React
-    open Fable.React.Props
-    open Fulma
-    open Fable.FontAwesome
-
-    let view (state : State) (dispatch : Msg -> unit) =
-        let tagsSuggestions =
-            match state.TagsSuggestions with
-            | Resolved xs -> xs
-            | _ -> [||]
-        InputTags.inputTags
-            "inputTagsId"
-            (SetInputTagsState >> dispatch)
-            (GetSuggestions >> dispatch)
-            tagsSuggestions
-            state.InputTagsState
+    let update msg state =
+        InputTags.update api.getTagSuggestions msg state
 
 open Fable.React
 open Fable.React.Props

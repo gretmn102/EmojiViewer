@@ -219,7 +219,7 @@ GIT
   remote: https://github.com/gretmn102/LiteDB.FSharp.git
      (b24daf63aa1fbfbabfb211332cad089dc0742420)
   remote: https://github.com/gretmn102/FulmaExtensions.git
-     (86815e813ace9f21e0034a0c216ea302ea741691)
+     (ec9837da037d0bb49873c7e3ec97632384687b2f)
   remote: https://github.com/gretmn102/FsharpMyExtension.git
      (2b4ccb04b0e01a0402605868b59f62db10326916)
       build: build.cmd
