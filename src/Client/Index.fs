@@ -20,6 +20,7 @@ open Fable.React
 open Fable.React.Props
 open Fulma
 open Fable.FontAwesome
+open Feliz.Router
 
 let spinner =
     div [ Class ("block " + Fa.Classes.Size.Fa3x) ] [
@@ -167,16 +168,44 @@ type Msg =
     | InputTagsMsg of InputTags.Msg
     | Find
     | FindResult of Emoji list
+    | ChangeUrl of string list
+
+[<Literal>]
+let TagRoute = "tag"
+
+let parseUrl state segments =
+    match segments with
+    | [] ->
+        state, Cmd.none
+    | TagRoute::tag::_ ->
+        let cmd =
+            Cmd.OfAsync.perform api.getEmojisByTag tag FindResult
+
+        let state =
+            { state with
+                EmojisResult = InProgress
+                FindEmojisByTags =
+                    let x = InputTags.init()
+                    { x with
+                        InputTagsState =
+                            { x.InputTagsState with
+                                Tags = [tag]
+                            }
+                    }
+            }
+        state, cmd
+    | _ ->
+        state, Cmd.none
 
 let init(): State * Cmd<Msg> =
-    let model =
+    let state =
         {
             EmojiUploadForm = EmojiUploadForm.init ()
             FindEmojisByTags = InputTags.init ()
             EmojisResult = HasNotStartedYet
         }
-    // let cmd = Cmd.OfAsync.perform api.getTodos () GotTodos
-    model, Cmd.none
+    Router.currentUrl()
+    |> parseUrl state
 
 let update (msg: Msg) (state: State): State * Cmd<Msg> =
     match msg with
@@ -201,6 +230,8 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
 
     | Find ->
         match state.FindEmojisByTags.InputTagsState.Tags with
+        | [tag] ->
+            state, Feliz.Router.Cmd.navigate [|TagRoute; tag|]
         | tag::tags -> // TODO
             let cmd =
                 Cmd.OfAsync.perform api.getEmojisByTag tag FindResult
@@ -216,6 +247,8 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
                 EmojisResult = Resolved emojis }
         state, Cmd.none
 
+    | ChangeUrl segments ->
+        parseUrl state segments
 
 open Fable.React
 open Fable.React.Props
@@ -261,10 +294,35 @@ let containerBox (state : State) (dispatch : Msg -> unit) =
             match state.EmojisResult with
             | HasNotStartedYet -> ()
             | Resolved emojis ->
+                let activatedTagsRender tags =
+                    Tag.list [] [
+                        for x in tags do
+                            Tag.tag [
+                            ] [
+                                a [Href (Router.format [TagRoute; x])] [str x]
+                            ]
+
+                    ]
                 Content.content [] [
                     Content.Ol.ol [] [
                         for emoji in emojis do
-                            li [] [ str (sprintf "%A" emoji) ]
+                            activatedTagsRender emoji.Tags
+                            img [ Src emoji.Id ]
+
+                            match Browser.Navigator.navigator.clipboard with
+                            | Some clipboard ->
+                                Button.span [
+                                    Button.OnClick (fun _ ->
+                                        clipboard.writeText emoji.Id
+                                        |> ignore
+                                    )
+                                ] [
+                                Fa.span [ Fa.Solid.Clipboard
+                                          Fa.FixedWidth
+                                        ]
+                                    [ ]
+                                ]
+                            | None -> ()
                     ]
                 ]
             | InProgress -> spinner
@@ -288,14 +346,19 @@ let view (model : State) (dispatch : Msg -> unit) =
             ]
         ]
 
-        Hero.body [] [
-            Container.container [] [
-                Column.column [
-                    Column.Width (Screen.All, Column.Is6)
-                    Column.Offset (Screen.All, Column.Is3)
-                ] [
-                    Heading.p [ Heading.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [ str "SAFE" ]
-                    containerBox model dispatch
+        Feliz.React.router [
+            router.onUrlChanged (ChangeUrl >> dispatch)
+            router.children [
+                Hero.body [] [
+                    Container.container [] [
+                        Column.column [
+                            Column.Width (Screen.All, Column.Is6)
+                            Column.Offset (Screen.All, Column.Is3)
+                        ] [
+                            Heading.p [ Heading.Modifiers [ Modifier.TextAlignment (Screen.All, TextAlignment.Centered) ] ] [ str "SAFE" ]
+                            containerBox model dispatch
+                        ]
+                    ]
                 ]
             ]
         ]

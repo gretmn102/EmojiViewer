@@ -18,6 +18,7 @@ nuget Fable.React
 nuget Fable.Remoting.Client
 nuget Fulma
 nuget Feliz
+nuget Feliz.Router
 nuget Fable.Browser.Navigator
 git https://github.com/gretmn102/FulmaExtensions.git
 nuget Zanaptak.TypedCssClasses
