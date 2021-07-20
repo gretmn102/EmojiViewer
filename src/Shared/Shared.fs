@@ -25,9 +25,12 @@ module Route =
     let builder typeName methodName =
         sprintf "/api/%s/%s" typeName methodName
 
+type InsertEmojiError =
+    | EmojiAlreadyExist
+
 type IApi =
     {
-        insertEmoji : Emoji -> Async<unit>
+        insertEmoji : Emoji -> Async<Result<unit, InsertEmojiError>>
         getEmojisByTag : TagId -> Async<Emoji list>
         getTagSuggestions : string -> Async<string []>
     }

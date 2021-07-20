@@ -92,37 +92,38 @@ let remove (emojiId:EmojiId) (db:LocalDb) =
         }
     | None -> db
 
-let insertOrUpdate (emoji:Emoji) (db:LocalDb) =
-    let updateTags localTags =
-        emoji.Tags
-        |> Set.fold
-            (fun (st:Map<TagId,Tag>) tagId ->
-                let f tag =
+let updateTags (emoji:Emoji) localTags =
+    emoji.Tags
+    |> Set.fold
+        (fun (st:Map<TagId,Tag>) tagId ->
+            let f tag =
+                let tag =
+                    { tag with
+                        EmojiIds =
+                            Set.add emoji.Id tag.EmojiIds
+                    }
+                dbTags.Update tag |> ignore
+
+                Map.add tagId tag st
+            match Map.tryFind tagId st with
+            | Some tag -> f tag
+            | None ->
+                let oldTag = dbTags.FindById (LiteDB.BsonValue tagId)
+                if isNull (box oldTag) then
                     let tag =
-                        { tag with
-                            EmojiIds =
-                                Set.add emoji.Id tag.EmojiIds
+                        {
+                            Id = tagId
+                            EmojiIds = Set.singleton emoji.Id
                         }
-                    dbTags.Update tag |> ignore
+                    dbTags.Insert tag |> ignore
 
                     Map.add tagId tag st
-                match Map.tryFind tagId st with
-                | Some tag -> f tag
-                | None ->
-                    let oldTag = dbTags.FindById (LiteDB.BsonValue tagId)
-                    if isNull (box oldTag) then
-                        let tag =
-                            {
-                                Id = tagId
-                                EmojiIds = Set.singleton emoji.Id
-                            }
-                        dbTags.Insert tag |> ignore
+                else
+                    f oldTag
+        )
+        localTags
 
-                        Map.add tagId tag st
-                    else
-                        f oldTag
-            )
-            localTags
+let insertOrUpdate (emoji:Emoji) (db:LocalDb) =
     let f (oldEmoji:Emoji) =
         {
             Emojis =
@@ -131,20 +132,8 @@ let insertOrUpdate (emoji:Emoji) (db:LocalDb) =
             Tags =
                 let tags =
                     removeTags oldEmoji db.Tags
-                    // oldEmoji.Tags
-                    // |> Set.fold (fun (st:Map<TagId, Tag>) tagId ->
-                    //     let tag = st.[tagId]
-                    //     let tag =
-                    //         { tag with
-                    //             EmojiIds = Set.remove emoji.Id tag.EmojiIds
-                    //         }
 
-                    //     tags.Update(tag) |> ignore
-
-                    //     Map.add tagId tag st
-                    // ) db.Tags
-
-                updateTags tags
+                updateTags emoji tags
         }
     match Map.tryFind emoji.Id db.Emojis with
     | Some oldEmoji -> f oldEmoji
@@ -156,10 +145,28 @@ let insertOrUpdate (emoji:Emoji) (db:LocalDb) =
                     dbEmojis.Insert(emoji) |> ignore
 
                     Map.add emoji.Id emoji db.Emojis
-                Tags = updateTags db.Tags
+                Tags = updateTags emoji db.Tags
             }
         else
             f oldEmoji
+
+/// Returns None if emoji exists
+let insert (emoji:Emoji) (db:LocalDb) =
+    match Map.tryFind emoji.Id db.Emojis with
+    | None ->
+        let oldEmoji = dbEmojis.FindById (LiteDB.BsonValue emoji.Id)
+        if isNull (box oldEmoji) then
+            {
+                Emojis =
+                    dbEmojis.Insert(emoji) |> ignore
+
+                    Map.add emoji.Id emoji db.Emojis
+                Tags = updateTags emoji db.Tags
+            }
+            |> Some
+        else
+            None
+    | Some oldEmoji -> None
 
 let test () =
     let localDb =

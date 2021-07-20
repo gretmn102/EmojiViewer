@@ -7,7 +7,7 @@ open Saturn
 open Shared
 
 type Cmd =
-    | InsertEmoji of Emoji
+    | InsertEmoji of Emoji * AsyncReplyChannel<Result<unit, InsertEmojiError>>
     | GetEmojisByTag of TagId * AsyncReplyChannel<Emoji list>
     | GetTagSuggestions of pattern:string * AsyncReplyChannel<string []>
 
@@ -18,8 +18,16 @@ let p =
                 let! msg = mail.Receive()
                 let st =
                     match msg with
-                    | InsertEmoji emoji ->
-                        Db.insertOrUpdate emoji st
+                    | InsertEmoji (emoji, r) ->
+                        match Db.insert emoji st with
+                        | Some(st) ->
+                            r.Reply (Ok ())
+
+                            st
+                        | None ->
+                            r.Reply (Error EmojiAlreadyExist)
+
+                            st
                     | GetEmojisByTag (tagId, r) ->
                         match Db.findEmojisByTag tagId st with
                         | Some(xs, st) ->
@@ -45,14 +53,12 @@ let api =
             }
         insertEmoji = fun emoji ->
             async {
-                p.Post(InsertEmoji emoji)
-                return ()
+                return p.PostAndReply(fun r -> InsertEmoji(emoji, r))
             }
         getTagSuggestions = fun pattern ->
             async {
                 return p.PostAndReply(fun r -> GetTagSuggestions(pattern, r))
             }
-
     }
 
 let webApp =

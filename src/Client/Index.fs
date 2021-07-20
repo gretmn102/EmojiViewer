@@ -31,7 +31,7 @@ module EmojiUploadForm =
         {
             Url: string
             Tags: InputTags.State
-            SubmiteResult: unit Deferred
+            SubmitResult: Result<unit,InsertEmojiError> Deferred
         }
 
     let init () =
@@ -39,7 +39,7 @@ module EmojiUploadForm =
             {
                 Url = ""
                 Tags = InputTags.init()
-                SubmiteResult = HasNotStartedYet
+                SubmitResult = HasNotStartedYet
             }
         state
 
@@ -47,13 +47,14 @@ module EmojiUploadForm =
         | InputTagsMsg of InputTags.Msg
         | UpdateUrl of string
         | Submit
-        | SubmitResult of unit
+        | SubmitResult of Result<unit,InsertEmojiError>
     let update (msg: Msg) (state: State) =
         match msg with
         | UpdateUrl url ->
             let state =
                 { state with
                     Url = url
+                    SubmitResult = HasNotStartedYet
                 }
             state, Cmd.none
 
@@ -70,7 +71,7 @@ module EmojiUploadForm =
         | Submit ->
             let state =
                 { state with
-                    SubmiteResult = InProgress
+                    SubmitResult = InProgress
                 }
             let emoji =
                 {
@@ -84,7 +85,7 @@ module EmojiUploadForm =
         | SubmitResult res ->
             let state =
                 { state with
-                    SubmiteResult = Resolved res
+                    SubmitResult = Resolved res
                 }
             state, Cmd.none
 
@@ -95,8 +96,8 @@ module EmojiUploadForm =
 
     let view (state : State) (dispatch : Msg -> unit) =
         Box.box' [] [
-            match state.SubmiteResult with
-            | HasNotStartedYet | Resolved(_) ->
+            match state.SubmitResult with
+            | HasNotStartedYet ->
                 Control.p [ Control.IsExpanded ] [
                     Input.text [
                       Input.Value state.Url
@@ -107,7 +108,9 @@ module EmojiUploadForm =
                 InputTags.view state.Tags (InputTagsMsg >> dispatch)
 
                 Button.button [
-                    let isDisabled = System.String.IsNullOrWhiteSpace state.Url
+                    let isDisabled =
+                        System.String.IsNullOrWhiteSpace state.Url
+                        && List.isEmpty state.Tags.InputTagsState.Tags
                     Button.Disabled isDisabled
                     Button.OnClick (fun _ ->
                         if not isDisabled then
@@ -115,6 +118,37 @@ module EmojiUploadForm =
                     )
                 ] [
                     str "Submit"
+                ]
+            | Resolved err ->
+                Control.p [ Control.IsExpanded ] [
+                    Input.text [
+                      Input.Value state.Url
+                      Input.Placeholder "Url"
+                      Input.OnChange (fun x -> UpdateUrl x.Value |> dispatch) ]
+                ]
+
+                InputTags.view state.Tags (InputTagsMsg >> dispatch)
+
+                Button.button [
+                    Button.Color
+                        (match err with
+                        | Ok _ ->
+                            Color.IsSuccess
+                        | Error _ ->
+                            Color.IsDanger)
+
+                    let isDisabled = true
+                    Button.Disabled isDisabled
+                    Button.OnClick (fun _ ->
+                        if not isDisabled then
+                            dispatch Submit
+                    )
+                ] [
+                    match err with
+                    | Ok _ ->
+                        str "Done"
+                    | Error x ->
+                        str (sprintf "%A" x)
                 ]
 
             | InProgress -> spinner
