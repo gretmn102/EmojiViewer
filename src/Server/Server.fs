@@ -13,39 +13,48 @@ type Cmd =
     | GetTagSuggestions of pattern:string * AsyncReplyChannel<string []>
 
 let p =
+    let exec msg (st:Db.LocalDb) =
+        match msg with
+        | InsertEmoji (emoji, r) ->
+            match Db.insert emoji st with
+            | Some(st) ->
+                r.Reply (Ok ())
+
+                st
+            | None ->
+                r.Reply (Error EmojiAlreadyExist)
+
+                st
+        | UpdateEmoji (emoji, r) ->
+            let db = Db.insertOrUpdate emoji st
+
+            r.Reply (Ok ())
+
+            db
+        | GetEmojisByTag (tagId, r) ->
+            match Db.findEmojisByTag tagId st with
+            | Some(xs, st) ->
+                r.Reply (List.ofSeq xs)
+
+                st
+            | None ->
+                r.Reply []
+
+                st
+        | GetTagSuggestions(pattern, r) ->
+            let tagIds, st = Db.getTagSuggestions pattern st
+            r.Reply tagIds
+
+            st
     MailboxProcessor.Start(fun mail ->
         let rec loop (st:Db.LocalDb) =
             async {
                 let! msg = mail.Receive()
                 let st =
-                    match msg with
-                    | InsertEmoji (emoji, r) ->
-                        match Db.insert emoji st with
-                        | Some(st) ->
-                            r.Reply (Ok ())
-
-                            st
-                        | None ->
-                            r.Reply (Error EmojiAlreadyExist)
-
-                            st
-                    | UpdateEmoji (emoji, r) ->
-                        let db = Db.insertOrUpdate emoji st
-
-                        r.Reply (Ok ())
-
-                        db
-                    | GetEmojisByTag (tagId, r) ->
-                        match Db.findEmojisByTag tagId st with
-                        | Some(xs, st) ->
-                            r.Reply (List.ofSeq xs)
-
-                            st
-                        | None -> st
-                    | GetTagSuggestions(pattern, r) ->
-                        let tagIds, st = Db.getTagSuggestions pattern st
-                        r.Reply tagIds
-
+                    try
+                        exec msg st
+                    with e ->
+                        printfn "%A" e
                         st
                 return! loop st
             }
