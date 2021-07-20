@@ -8,6 +8,7 @@ open Shared
 
 type Cmd =
     | InsertEmoji of Emoji * AsyncReplyChannel<Result<unit, InsertEmojiError>>
+    | UpdateEmoji of Emoji * AsyncReplyChannel<Result<unit, unit>>
     | GetEmojisByTag of TagId * AsyncReplyChannel<Emoji list>
     | GetTagSuggestions of pattern:string * AsyncReplyChannel<string []>
 
@@ -28,6 +29,12 @@ let p =
                             r.Reply (Error EmojiAlreadyExist)
 
                             st
+                    | UpdateEmoji (emoji, r) ->
+                        let db = Db.insertOrUpdate emoji st
+
+                        r.Reply (Ok ())
+
+                        db
                     | GetEmojisByTag (tagId, r) ->
                         match Db.findEmojisByTag tagId st with
                         | Some(xs, st) ->
@@ -54,6 +61,10 @@ let api =
         insertEmoji = fun emoji ->
             async {
                 return p.PostAndReply(fun r -> InsertEmoji(emoji, r))
+            }
+        updateEmoji = fun emoji ->
+            async {
+                return p.PostAndReply(fun r -> UpdateEmoji(emoji, r))
             }
         getTagSuggestions = fun pattern ->
             async {
