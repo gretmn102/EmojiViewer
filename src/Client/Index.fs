@@ -43,6 +43,7 @@ module EmojiUploadForm =
             Url: string
             Tags: InputTags.State
             SubmitResult: Result<unit,InsertEmojiError> Deferred
+            EmojiUploadFormVisible: bool
         }
 
     let init () =
@@ -51,6 +52,7 @@ module EmojiUploadForm =
                 Url = ""
                 Tags = InputTags.init []
                 SubmitResult = HasNotStartedYet
+                EmojiUploadFormVisible = false
             }
         state
 
@@ -59,6 +61,8 @@ module EmojiUploadForm =
         | UpdateUrl of string
         | Submit
         | SubmitResult of Result<unit,InsertEmojiError>
+        | FormVisible of bool
+
     let update (msg: Msg) (state: State) =
         match msg with
         | UpdateUrl url ->
@@ -99,6 +103,12 @@ module EmojiUploadForm =
                     SubmitResult = Resolved res
                 }
             state, Cmd.none
+        | FormVisible visible ->
+            let state =
+                { state with
+                    EmojiUploadFormVisible = visible
+                }
+            state, Cmd.none
 
     open Fable.React
     open Fable.React.Props
@@ -106,63 +116,102 @@ module EmojiUploadForm =
     open Fable.FontAwesome
 
     let view (state : State) (dispatch : Msg -> unit) =
-        Box.box' [] [
-            match state.SubmitResult with
-            | HasNotStartedYet ->
-                Control.p [ Control.IsExpanded ] [
-                    Input.text [
-                      Input.Value state.Url
-                      Input.Placeholder "Url"
-                      Input.OnChange (fun x -> UpdateUrl x.Value |> dispatch) ]
+        let close _ =
+            dispatch (FormVisible false)
+
+        Modal.modal [
+            Modal.IsActive state.EmojiUploadFormVisible
+        ] [
+            Modal.background [
+                Props [
+                    OnClick close
                 ]
+            ] []
+            Modal.Card.card [
+            ] [
+                Modal.Card.head [] [
+                    Modal.Card.title [] [ str "Add emoji"]
 
-                InputTags.view state.Tags (InputTagsMsg >> dispatch)
-
-                Button.button [
-                    let isDisabled =
-                        System.String.IsNullOrWhiteSpace state.Url
-                        && List.isEmpty state.Tags.InputTagsState.Tags
-                    Button.Disabled isDisabled
-                    Button.OnClick (fun _ ->
-                        if not isDisabled then
-                            dispatch Submit
-                    )
+                    Delete.delete [
+                        Delete.OnClick close
+                    ] []
+                ]
+                Modal.Card.body [
                 ] [
-                    str "Submit"
+                    match state.SubmitResult with
+                    | HasNotStartedYet ->
+                        Control.p [ Control.IsExpanded ] [
+                            Input.text [
+                              Input.Value state.Url
+                              Input.Placeholder "Url"
+                              Input.OnChange (fun x -> UpdateUrl x.Value |> dispatch) ]
+                        ]
+
+                        InputTags.view state.Tags (InputTagsMsg >> dispatch)
+
+                    | Resolved err ->
+                        Control.p [ Control.IsExpanded ] [
+                            Input.text [
+                              Input.Value state.Url
+                              Input.Placeholder "Url"
+                              Input.OnChange (fun x -> UpdateUrl x.Value |> dispatch) ]
+                        ]
+
+                        InputTags.view state.Tags (InputTagsMsg >> dispatch)
+                    | InProgress -> spinner
                 ]
-            | Resolved err ->
-                Control.p [ Control.IsExpanded ] [
-                    Input.text [
-                      Input.Value state.Url
-                      Input.Placeholder "Url"
-                      Input.OnChange (fun x -> UpdateUrl x.Value |> dispatch) ]
+                Modal.Card.foot [] [
+                    match state.SubmitResult with
+                    | HasNotStartedYet ->
+                        Button.button [
+                            let isDisabled =
+                                System.String.IsNullOrWhiteSpace state.Url
+                                || List.isEmpty state.Tags.InputTagsState.Tags
+                            Button.Disabled isDisabled
+                            Button.OnClick (fun _ ->
+                                if not isDisabled then
+                                    dispatch Submit
+                            )
+                        ] [
+                            str "Submit"
+                        ]
+
+                        Button.button [
+                            Button.OnClick close
+                        ] [
+                            str "Close"
+                        ]
+                    | Resolved err ->
+                        Button.button [
+                            Button.Color
+                                (match err with
+                                | Ok _ ->
+                                    Color.IsSuccess
+                                | Error _ ->
+                                    Color.IsDanger)
+
+                            let isDisabled = true
+                            Button.Disabled isDisabled
+                            Button.OnClick (fun _ ->
+                                if not isDisabled then
+                                    dispatch Submit
+                            )
+                        ] [
+                            match err with
+                            | Ok _ ->
+                                str "Done"
+                            | Error x ->
+                                str (sprintf "%A" x)
+                        ]
+
+                        Button.button [
+                            Button.OnClick close
+                        ] [
+                            str "Close"
+                        ]
+                    | InProgress -> spinner
                 ]
-
-                InputTags.view state.Tags (InputTagsMsg >> dispatch)
-
-                Button.button [
-                    Button.Color
-                        (match err with
-                        | Ok _ ->
-                            Color.IsSuccess
-                        | Error _ ->
-                            Color.IsDanger)
-
-                    let isDisabled = true
-                    Button.Disabled isDisabled
-                    Button.OnClick (fun _ ->
-                        if not isDisabled then
-                            dispatch Submit
-                    )
-                ] [
-                    match err with
-                    | Ok _ ->
-                        str "Done"
-                    | Error x ->
-                        str (sprintf "%A" x)
-                ]
-
-            | InProgress -> spinner
+            ]
         ]
 
 
@@ -327,6 +376,7 @@ type State =
 
 type Msg =
     | EmojiUploadFormMsg of EmojiUploadForm.Msg
+
     | InputTagsMsg of InputTags.Msg
 
     | Find
@@ -373,6 +423,7 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
                 EmojiUploadForm = emojiUploadFormState
             }
         state, Cmd.map EmojiUploadFormMsg cmd
+
     | InputTagsMsg msg ->
         let inputTagsState, cmd =
             InputTags.update msg state.FindEmojisByTags
@@ -433,7 +484,7 @@ open Fable.React
 open Fable.React.Props
 open Fulma
 
-let navBrand =
+let navBrand dispatch =
     Navbar.Brand.div [] [
         Navbar.Item.a [
             Navbar.Item.Props [ Href "https://safe-stack.github.io/" ]
@@ -444,62 +495,69 @@ let navBrand =
                 Alt "Logo"
             ]
         ]
+        Navbar.Item.a [
+            Navbar.Item.Props [
+                OnClick (fun _ ->
+                    dispatch (EmojiUploadFormMsg (EmojiUploadForm.FormVisible true))
+                )
+            ]
+        ] [
+            str "Add emoji"
+        ]
     ]
 
 let containerBox (state : State) (dispatch : Msg -> unit) =
     Box.box' [] [
         EmojiUploadForm.view state.EmojiUploadForm (EmojiUploadFormMsg >> dispatch)
 
-        Box.box' [] [
-            str "Find by tags:"
-            InputTags.view state.FindEmojisByTags (InputTagsMsg >> dispatch)
+        str "Find by tags:"
+        InputTags.view state.FindEmojisByTags (InputTagsMsg >> dispatch)
 
-            Button.button [
-                let isLoading =
-                    state.EmojisResult = InProgress
-                Button.IsLoading isLoading
-                let isDisabled =
-                    List.isEmpty state.FindEmojisByTags.InputTagsState.Tags
-                    || isLoading
-                Button.Disabled isDisabled
-                Button.OnClick (fun _ ->
-                    if not isDisabled then
-                        dispatch Find
-                )
-            ] [
-                str "Find"
-            ]
-
-            match state.EmojisResult with
-            | HasNotStartedYet -> ()
-            | Resolved emojis ->
-                Content.content [] [
-                    Content.Ol.ol [] [
-                        for KeyValue(emojiId, emojiState) in emojis do
-                            EmojiTagsEdit.view emojiState (fun msg ->
-                                EmojiTagsEditMsg(emojiId, msg)
-                                |> dispatch)
-
-                            img [ Src emojiId ]
-
-                            match Browser.Navigator.navigator.clipboard with
-                            | Some clipboard ->
-                                Button.span [
-                                    Button.OnClick (fun _ ->
-                                        clipboard.writeText emojiId
-                                        |> ignore
-                                    )
-                                ] [
-                                Fa.span [ Fa.Solid.Clipboard
-                                          Fa.FixedWidth
-                                        ]
-                                    [ ]
-                                ]
-                            | None -> ()
-                    ]
-                ]
-            | InProgress -> spinner
+        Button.button [
+            let isLoading =
+                state.EmojisResult = InProgress
+            Button.IsLoading isLoading
+            let isDisabled =
+                List.isEmpty state.FindEmojisByTags.InputTagsState.Tags
+                || isLoading
+            Button.Disabled isDisabled
+            Button.OnClick (fun _ ->
+                if not isDisabled then
+                    dispatch Find
+            )
+        ] [
+            str "Find"
         ]
+
+        match state.EmojisResult with
+        | HasNotStartedYet -> ()
+        | Resolved emojis ->
+            Content.content [] [
+                Content.Ol.ol [] [
+                    for KeyValue(emojiId, emojiState) in emojis do
+                        EmojiTagsEdit.view emojiState (fun msg ->
+                            EmojiTagsEditMsg(emojiId, msg)
+                            |> dispatch)
+
+                        img [ Src emojiId ]
+
+                        match Browser.Navigator.navigator.clipboard with
+                        | Some clipboard ->
+                            Button.span [
+                                Button.OnClick (fun _ ->
+                                    clipboard.writeText emojiId
+                                    |> ignore
+                                )
+                            ] [
+                            Fa.span [ Fa.Solid.Clipboard
+                                      Fa.FixedWidth
+                                    ]
+                                [ ]
+                            ]
+                        | None -> ()
+                ]
+            ]
+        | InProgress -> spinner
     ]
 
 let view (model : State) (dispatch : Msg -> unit) =
@@ -515,7 +573,7 @@ let view (model : State) (dispatch : Msg -> unit) =
     ] [
         Hero.head [] [
             Navbar.navbar [] [
-                Container.container [] [ navBrand ]
+                Container.container [] [ navBrand dispatch ]
             ]
         ]
 
