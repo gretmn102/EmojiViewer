@@ -371,7 +371,7 @@ type State =
     {
         EmojiUploadForm: EmojiUploadForm.State
         FindEmojisByTags: InputTags.State
-        EmojisResult: Deferred<Map<EmojiId, EmojiTagsEdit.EmojiState>>
+        EmojisResult: Deferred<EmojiTagsEdit.EmojiState []>
     }
 
 type Msg =
@@ -380,10 +380,10 @@ type Msg =
     | InputTagsMsg of InputTags.Msg
 
     | Find
-    | FindResult of Emoji list
+    | FindResult of Emoji []
 
     | ChangeUrl of string list
-    | EmojiTagsEditMsg of EmojiId * EmojiTagsEdit.Msg
+    | EmojiTagsEditMsg of int * EmojiTagsEdit.Msg
 
 let parseUrl state segments =
     match segments with
@@ -452,32 +452,25 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
             { state with
                 EmojisResult =
                     emojis
-                    |> List.fold
-                        (fun st emoji ->
-                            Map.add emoji.Id (EmojiTagsEdit.init emoji) st
-                        )
-                        Map.empty
+                    |> Array.map EmojiTagsEdit.init
                     |> Resolved }
         state, Cmd.none
 
     | ChangeUrl segments ->
         parseUrl state segments
 
-    | EmojiTagsEditMsg(emojiId, msg) ->
+    | EmojiTagsEditMsg(idx, msg) ->
         match state.EmojisResult with
         | Resolved emojis ->
-            match Map.tryFind emojiId emojis with
-            | Some emojiState ->
-                let emojiState, cmd =
-                    EmojiTagsEdit.update msg emojiState
-                let state =
-                    { state with
-                        EmojisResult =
-                            Resolved (Map.add emojiId emojiState emojis) }
-                let cmd = Cmd.map (fun msg -> EmojiTagsEditMsg(emojiId, msg)) cmd
-                state, cmd
-            | None ->
-                state, Cmd.none
+            let emojiState, cmd =
+                EmojiTagsEdit.update msg emojis.[idx]
+            let state =
+                { state with
+                    EmojisResult =
+                        emojis.[idx] <- emojiState
+                        Resolved emojis }
+            let cmd = Cmd.map (fun msg -> EmojiTagsEditMsg(idx, msg)) cmd
+            state, cmd
         | _ -> state, Cmd.none
 
 open Fable.React
@@ -534,11 +527,11 @@ let containerBox (state : State) (dispatch : Msg -> unit) =
         | Resolved emojis ->
             Content.content [] [
                 Content.Ol.ol [] [
-                    for KeyValue(emojiId, emojiState) in emojis do
+                    for idx, emojiState in Array.indexed emojis do
                         EmojiTagsEdit.view emojiState (fun msg ->
-                            EmojiTagsEditMsg(emojiId, msg)
+                            EmojiTagsEditMsg(idx, msg)
                             |> dispatch)
-
+                        let emojiId = emojiState.Emoji.Id
                         img [ Src emojiId ]
 
                         match Browser.Navigator.navigator.clipboard with

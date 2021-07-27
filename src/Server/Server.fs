@@ -9,7 +9,7 @@ open Shared
 type Cmd =
     | InsertEmoji of Emoji * AsyncReplyChannel<Result<unit, InsertEmojiError>>
     | UpdateEmoji of Emoji * AsyncReplyChannel<Result<unit, unit>>
-    | GetEmojisByTag of TagId * AsyncReplyChannel<Emoji list>
+    | GetEmojisByTag of TagId * AsyncReplyChannel<Emoji []>
     | GetTagSuggestions of pattern:string * AsyncReplyChannel<string []>
 
 let p =
@@ -34,11 +34,11 @@ let p =
         | GetEmojisByTag (tagId, r) ->
             match Db.findEmojisByTag tagId st with
             | Some(xs, st) ->
-                r.Reply (List.ofSeq xs)
+                r.Reply (Array.ofSeq xs)
 
                 st
             | None ->
-                r.Reply []
+                r.Reply [||]
 
                 st
         | GetTagSuggestions(pattern, r) ->

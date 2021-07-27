@@ -32,6 +32,6 @@ type IApi =
     {
         insertEmoji : Emoji -> Async<Result<unit, InsertEmojiError>>
         updateEmoji : Emoji -> Async<Result<unit, unit>>
-        getEmojisByTag : TagId -> Async<Emoji list>
+        getEmojisByTag : TagId -> Async<Emoji []>
         getTagSuggestions : string -> Async<string []>
     }
