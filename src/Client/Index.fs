@@ -324,7 +324,7 @@ module EmojiTagsEdit =
                 for x in emoji'.Tags do
                     Tag.tag [
                     ] [
-                        a [Href (Router.format [TagRoute; x])] [str x]
+                        a [Href (Router.format [TagRoute; Router.encodeURIComponent x])] [str x]
                     ]
 
                 Button.button [
@@ -390,6 +390,7 @@ let parseUrl state segments =
     | [] ->
         state, Cmd.none
     | TagRoute::tag::_ ->
+        let tag = Router.decodeURIComponent tag
         let cmd =
             Cmd.OfAsync.perform api.getEmojisByTag tag FindResult
 
@@ -437,7 +438,7 @@ let update (msg: Msg) (state: State): State * Cmd<Msg> =
     | Find ->
         match state.FindEmojisByTags.InputTagsState.Tags with
         | [tag] ->
-            state, Feliz.Router.Cmd.navigate [|TagRoute; tag|]
+            state, Feliz.Router.Cmd.navigate [|TagRoute; Router.encodeURIComponent tag|]
         | tag::tags -> // TODO
             let cmd =
                 Cmd.OfAsync.perform api.getEmojisByTag tag FindResult
