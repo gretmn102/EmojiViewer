@@ -527,28 +527,46 @@ let containerBox (state : State) (dispatch : Msg -> unit) =
         | HasNotStartedYet -> ()
         | Resolved emojis ->
             Content.content [] [
-                Content.Ol.ol [] [
+                Content.Ol.ol [
+                    Content.Ol.IsUpperAlpha
+                ] [
                     for idx, emojiState in Array.indexed emojis do
-                        EmojiTagsEdit.view emojiState (fun msg ->
-                            EmojiTagsEditMsg(idx, msg)
-                            |> dispatch)
-                        let emojiId = emojiState.Emoji.Id
-                        img [ Src emojiId ]
-
-                        match Browser.Navigator.navigator.clipboard with
-                        | Some clipboard ->
-                            Button.span [
-                                Button.OnClick (fun _ ->
-                                    clipboard.writeText emojiId
-                                    |> ignore
-                                )
+                        li [] [
+                            EmojiTagsEdit.view emojiState (fun msg ->
+                                EmojiTagsEditMsg(idx, msg)
+                                |> dispatch)
+                            div [
+                                Class "emoji-container"
+                                Style [
+                                    Position PositionOptions.Relative
+                                    Width "fit-content"
+                                ]
                             ] [
-                            Fa.span [ Fa.Solid.Clipboard
-                                      Fa.FixedWidth
+                                let emojiId = emojiState.Emoji.Id
+                                img [
+                                    Class "image-op"
+                                    Src emojiId
+                                ]
+
+                                match Browser.Navigator.navigator.clipboard with
+                                | Some clipboard ->
+                                    Button.button [
+                                        Button.Props [
+                                            Class "bd-copy"
+                                        ]
+                                        Button.OnClick (fun _ ->
+                                            clipboard.writeText emojiId
+                                            |> ignore
+                                        )
+                                    ] [
+                                        Fa.span [
+                                            Fa.Solid.Clipboard
+                                            Fa.FixedWidth
+                                        ] []
                                     ]
-                                [ ]
+                                | None -> ()
                             ]
-                        | None -> ()
+                        ]
                 ]
             ]
         | InProgress -> spinner

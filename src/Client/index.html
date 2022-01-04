@@ -5,9 +5,26 @@
     <meta http-equiv='Content-Type' content='text/html; charset=utf-8'>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <link rel="shortcut icon" type="image/png" href="/favicon.png"/>
-    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css" integrity="sha512-+4zCK9k+qNFUR5X+cKL9EIR+ZOhtIloNl9GIKS57V1MyNsYpYcUrUeQc9vNfzsWfV28IaLL3i96P9sdNyeRssA==" crossorigin="anonymous" />
-    <link rel="stylesheet" type="text/css" href="https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.1/css/bulma.min.css" />
-    <link rel="stylesheet" type="text/css" href="https://unpkg.com/bulma-prefers-dark" />
+    <link rel="stylesheet" type="text/css" href="http://localhost:99/https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.14.0/css/all.min.css" />
+    <link rel="stylesheet" type="text/css" href="http://localhost:99/https://cdnjs.cloudflare.com/ajax/libs/bulma/0.9.1/css/bulma.min.css" />
+    <link rel="stylesheet" type="text/css" href="http://localhost:99/https://unpkg.com/bulma-prefers-dark" />
+    <style>
+        .emoji-container .image-op:hover {
+            opacity: 0.3;
+        }
+        .emoji-container .bd-copy {
+            position: absolute;
+            top: calc(1.25em - .5em - 1px);
+            right: calc(1.25em - .5em - 1px);
+            opacity: 0;
+        }
+        .emoji-container:hover .bd-copy {
+            opacity: 1;
+        }
+        .emoji-container .image-op:hover + .bd-copy {
+            opacity: 0.3;
+        }
+    </style>
 </head>
 <body>
     <div id="elmish-app"></div>
